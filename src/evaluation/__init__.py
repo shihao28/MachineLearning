@@ -1,1 +1,1 @@
-from .eval import ClassificationEval
+from .classification_eval import ClassificationEval
