@@ -23,7 +23,7 @@ from pathlib import Path
 import shutil
 
 from config import Config
-from evaluation import ClassificationEval
+from src.evaluation import ClassificationEval
 
 
 # Set log level
@@ -93,22 +93,22 @@ class Train:
         return train_data, test_data
 
     def __eda(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __imbalanced2balanced(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __remove_outlier(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __select_feat(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __impute_missing_val(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __feat_eng(self):
-        pass
+        raise NotImplementedError("WIP")
 
     def __create_train_pipeline(self, train_data, model_alg):
         # Numeric pipeline

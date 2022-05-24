@@ -5,7 +5,7 @@ from sklearn.svm import *
 
 class Config(object):
     data = dict(
-        data_path="https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv",
+        data_path="data/01_raw/housing.csv",
         label="above_median_house_value",
     )
 
