@@ -23,7 +23,7 @@ from pathlib import Path
 import shutil
 
 from config import Config
-from eval import ClassificationEval
+from evaluation import ClassificationEval
 
 
 # Set log level
