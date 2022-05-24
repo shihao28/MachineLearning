@@ -144,6 +144,7 @@ class Train:
         return train_pipeline
 
     def __eval(self, train_pipeline, test_data, metrics):
+        logging.info("Evaluating model...")
         y_prob = train_pipeline.predict_proba(test_data.drop(
             self.label, axis=1))
         evaluation_results = ClassificationEval(
@@ -153,8 +154,8 @@ class Train:
         return evaluation_results
 
     def __mlflow_logging(self, best_train_assets, train_data):
-        # check f1 score with cls report
         logging.info("Logging to mlflow...")
+        # check f1 score with cls report
         best_train_pipeline = best_train_assets.get("train_pipeline")
         best_evaluation_results = best_train_assets.get("evaluation_results")
         best_cls_report = self.__get_mlflow_cls_report(best_evaluation_results)
@@ -269,6 +270,9 @@ class Train:
 
         # Logging model and evaluation assets
         self.__mlflow_logging(best_train_assets, train_data)
+
+        # Print best evaluation score on test data
+        logging.info(f"Best {self.config.evaluation.get('classification')}: {best_score}")
 
         logging.info("Training completed")
 
