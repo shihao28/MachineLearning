@@ -1,4 +1,3 @@
-import os
 import logging
 import numpy as np
 import pandas as pd
@@ -16,14 +15,11 @@ from sklearn.svm import *
 from sklearn.model_selection import GridSearchCV
 from skopt import BayesSearchCV
 from sklearn.metrics import *
-from subprocess import Popen, DEVNULL
-import mlflow
-from mlflow.models.signature import infer_signature
-from pathlib import Path
-import shutil
 
 from config import Config
+from src.eda import EDA
 from src.evaluation import ClassificationEval
+from src.mlflow_logging import MlflowLogging
 
 
 # Set log level
@@ -38,35 +34,15 @@ class Train:
 
         logging.info("Initializing...")
         self.config = config
-        self.data = pd.read_csv(Config.data.get("data_path"))
-        self.label = config.data.get("label")
-        self.model_algs = config.model
-        self.split_ratio = config.train_val_test_split.get("split_ratio")
-        self.tune = config.param_grid.get("tune")
-        self.param_grids = config.param_grid
-        self.metrics = config.evaluation.get("classification")
+        self.problem_type = config["problem_type"]
+        self.data = pd.read_csv(config["data"]["data_path"])
+        self.label = config["data"]["label"]
+        self.model_algs = config["model"]
+        self.split_ratio = config["train_val_test_split"]["split_ratio"]
+        self.tune = config["param_grid"]["tune"]
+        self.param_grids = config["param_grid"]
+        self.metrics = config["evaluation"]["classification"]
         self.train_data, self.test_data = None, None
-
-        # Activating mlflow
-        tracking_uri = config.mlflow.get("tracking_uri")
-        backend_uri = config.mlflow.get("backend_uri")
-        artifact_uri = config.mlflow.get("artifact_uri")
-        mlflow_port = config.mlflow.get("port")
-        env = {
-            "MLFLOW_TRACKING_URI": f"{tracking_uri}:{mlflow_port}",
-            "BACKEND_URI": backend_uri,
-            "ARTIFACT_URI": artifact_uri,
-            "MLFLOW_PORT": mlflow_port
-            }
-        os.environ.update(env)
-        cmd_mlflow_server = (
-            f"mlflow server --backend-store-uri {backend_uri} "
-            f"--default-artifact-root {artifact_uri} "
-            f"--host 0.0.0.0 -p {mlflow_port}")
-        with open("stderr.txt", mode="wb") as out, open("stdout.txt", mode="wb") as err:
-            Popen(cmd_mlflow_server, stdout=out, stderr=err, stdin=DEVNULL,
-                  universal_newlines=True, encoding="utf-8",
-                  env=os.environ, shell=True)
 
     def __preprocessing(self):
         logging.info("Preprocess data...")
@@ -88,12 +64,13 @@ class Train:
         logging.info("Train-test splitting...")
         train_data, test_data = train_test_split(
             self.data, test_size=self.split_ratio,
-            stratify=self.data[self.label])
+            stratify=None if self.problem_type=="regression" else self.data[self.label])
 
         return train_data, test_data
 
-    def __eda(self):
-        raise NotImplementedError("WIP")
+    def __eda(self, data):
+        logging.info("Generating EDA report...")
+        eda = EDA(self.problem_type, data, self.label).generate_report()
 
     def __imbalanced2balanced(self):
         raise NotImplementedError("WIP")
@@ -155,62 +132,21 @@ class Train:
 
     def __mlflow_logging(self, best_train_assets, train_data):
         logging.info("Logging to mlflow...")
-        # check f1 score with cls report
-        best_train_pipeline = best_train_assets.get("train_pipeline")
-        best_evaluation_results = best_train_assets.get("evaluation_results")
-        best_cls_report = self.__get_mlflow_cls_report(best_evaluation_results)
-        best_threshold = best_train_assets.get("best_threshold")
-
-        mlflow.set_experiment(self.config.mlflow.get("experiment_name"))
-        with mlflow.start_run(run_name=self.config.mlflow.get("run_name")):
-            mlflow.log_param('target_variable', self.label)
-            mlflow.log_param('split_ratio', self.split_ratio)
-            mlflow.log_param('tune', self.tune)
-            mlflow.log_param('eval_metrics', self.config.evaluation.get("classification"))
-
-            mlflow.log_metrics(best_cls_report)
-            if best_threshold is not None:
-                mlflow.log_metrics("best_threshold", best_threshold)
-
-            signature = infer_signature(
-                train_data,
-                pd.DataFrame({self.label: best_train_pipeline.predict(
-                    train_data.drop(self.label, axis=1))}))
-            mlflow.sklearn.log_model(
-                sk_model=best_train_pipeline, artifact_path="sk_models",
-                signature=signature, input_example=train_data.sample(5),
-                registered_model_name=self.config.mlflow.get("registered_model_name")
-                )
-
-            # Store plots as artifacts
-            artifact_folder = Path("mlflow_tmp")
-            artifact_folder.mkdir(parents=True, exist_ok=True)
-
-            # Storing only figures, pd.DataFrames are excluded
-            conf_matrix_fig = best_evaluation_results.get("conf_matrix_fig")
-            conf_matrix_fig.savefig(Path(artifact_folder, "conf_matrix.png"))
-            fig_all = best_evaluation_results.get("fig")
-            for label, fig in fig_all.items():
-               fig.savefig(Path(artifact_folder, f"fig_{label}.png"))
-            mlflow.log_artifacts(
-                artifact_folder, artifact_path="evaluation_artifacts")
-            shutil.rmtree(artifact_folder)
+        mlflow_logging = MlflowLogging(
+            tracking_uri=self.config["mlflow"]["tracking_uri"],
+            backend_uri=self.config["mlflow"]["backend_uri"],
+            artifact_uri=self.config["mlflow"]["artifact_uri"],
+            mlflow_port=self.config["mlflow"]["port"],
+            experiment_name=self.config["mlflow"]["experiment_name"],
+            run_name=self.config["mlflow"]["run_name"],
+            registered_model_name=self.config["mlflow"]["registered_model_name"]
+        )
+        mlflow_logging.activate_mlflow_server()
+        mlflow_logging.logging(
+            best_train_assets, train_data, self.label,
+            self.split_ratio, self.tune,
+            self.config["evaluation"]["classification"])
         return None
-
-    def __get_mlflow_cls_report(self, best_evaluation_results):
-        best_cls_report = pd.DataFrame(best_evaluation_results.get("cls_report"))
-        best_cls_report["metrics"] = best_cls_report.index
-        best_cls_report.reset_index(drop=True, inplace=True)
-        best_cls_report = pd.melt(
-            best_cls_report, "metrics", best_cls_report.columns[:-1])
-        best_cls_report.loc[best_cls_report["variable"] == "accuracy", "metrics"] = ""
-        best_cls_report["metrics"] = best_cls_report["metrics"] + "_" + best_cls_report["variable"].astype(str)
-        best_cls_report.drop("variable", 1, inplace=True)
-        best_cls_report = pd.Series(
-            best_cls_report["value"].values,
-            index=best_cls_report["metrics"].values).to_dict()
-
-        return best_cls_report
 
     def train(self):
         # Preprocessing
@@ -218,6 +154,9 @@ class Train:
 
         # Train-test split
         train_data, test_data = self.__train_test_split()
+
+        # EDA
+        self.__eda(train_data)
 
         # Training
         train_assets = dict()
@@ -234,7 +173,7 @@ class Train:
                 # Grid Search SV
                 train_pipeline = GridSearchCV(
                     estimator=train_pipeline, param_grid=param_grid,
-                    scoring=self.config.evaluation.get("classification"),
+                    scoring=self.config["evaluation"]["classification"],
                     n_jobs=-1, cv=5).fit(
                         train_data.drop(self.label, axis=1), 
                         train_data[self.label].squeeze()
@@ -244,7 +183,7 @@ class Train:
                 # train_pipeline = BayesSearchCV(
                 #     estimator=train_pipeline, search_spaces=param_grid, 
                 #     optimizer_kwargs={"base_estimator": "GP"},
-                #     scoring=self.config.evaluation.get("classification"), n_jobs=-1, cv=5).fit(
+                #     scoring=self.config["evaluation"]["classification"], n_jobs=-1, cv=5).fit(
                 #         train_data.drop(self.label, axis=1), train_data[self.label]
                 #         ).best_estimator_
             else:
@@ -254,8 +193,8 @@ class Train:
 
             # Evaluation
             evaluation_results = self.__eval(
-                train_pipeline, test_data, 
-                self.config.evaluation.get("classification"))
+                train_pipeline, test_data,
+                self.config["evaluation"]["classification"])
             train_assets[model_alg_name] = {
                 "train_pipeline": train_pipeline,
                 "evaluation_results": evaluation_results
@@ -272,10 +211,10 @@ class Train:
         self.__mlflow_logging(best_train_assets, train_data)
 
         # Print best evaluation score on test data
-        logging.info(f"Best {self.config.evaluation.get('classification')}: {best_score}")
+        logging.info(f"Best {self.config['evaluation']['classification']}: {best_score}")
 
         logging.info("Training completed")
 
 
 if __name__ == "__main__":
-    Train(Config).train()
+    Train(Config.train).train()
