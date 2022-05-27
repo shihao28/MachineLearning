@@ -1,5 +1,7 @@
 from sklearn.linear_model import *
 from sklearn.ensemble import *
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from skopt import BayesSearchCV
 from sklearn.svm import *
 
 
@@ -8,11 +10,23 @@ class Config(object):
     # Training config
     train = dict(
 
+        # regression, classification, time_series
         problem_type="classification",
 
         data=dict(
-            data_path="data/01_raw/housing.csv",
+            data_path="data/01_raw/housing_binary_class.csv",
             label="above_median_house_value",
+            numeric_features=[
+                'longitude', 'latitude', 'housing_median_age', 'total_rooms',
+                'total_bedrooms', 'population', 'households', 'median_income',
+                'median_house_value'
+            ],
+            category_features=[
+                'ocean_proximity', 'above_median_house_value'
+            ],
+            datetime_features=[
+
+            ]
         ),
 
         train_val_test_split=dict(
@@ -24,8 +38,9 @@ class Config(object):
             LogisticRegression.__name__: LogisticRegression()
         },
 
-        param_grid={
+        tuning={
             "tune": False,
+            "search_method": GridSearchCV,  # RandomizedSearchCV, BayesSearchCV
             SVC.__name__: dict(
                 model__C=[1, 5],
                 model__kernel=["linear", "poly", "rbf"]
@@ -39,7 +54,7 @@ class Config(object):
             # Get list of metrics from below
             # https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
             regression="r2",
-            classification="recall_weighted"
+            classification="f1_weighted"
         ),
 
         mlflow=dict(
@@ -51,10 +66,13 @@ class Config(object):
             registered_model_name="my_cls_model",
             port="5000",
         ),
+
+        seed=0
     )
 
     # Prediction config
     predict = dict(
+
         data_path="data/01_raw/housing.csv",
 
         mlflow=dict(
