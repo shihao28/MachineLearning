@@ -5,7 +5,9 @@ import mlflow
 from mlflow.models.signature import infer_signature
 from pathlib import Path
 import shutil
+import requests
 import time
+import logging
 
 
 class MlflowLogging:
@@ -34,7 +36,17 @@ class MlflowLogging:
             Popen(self.cmd_mlflow_server, stdout=out, stderr=err, stdin=DEVNULL,
                   universal_newlines=True, encoding="utf-8",
                   env=os.environ, shell=True)
-        time.sleep(5)
+
+        # Keep pinging until mlfow server is up
+        while True:
+            try:
+                response = requests.get(f'{os.getenv("MLFLOW_TRACKING_URI")}/api/2.0/mlflow/experiments/list')
+                if str(response) == "<Response [200]>":
+                    logging.warning(f'MLFLOW tracking server response: {str(response)}')
+                    break
+            except requests.exceptions.ConnectionError:
+                logging.warning(f'Tracking server {os.getenv("MLFLOW_TRACKING_URI")} is not up and running')
+                time.sleep(1)
 
     def logging(self, best_train_assets, train_data, label, split_ratio, tune, eval_metrics):
         # check f1 score with cls report
