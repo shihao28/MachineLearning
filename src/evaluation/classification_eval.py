@@ -76,7 +76,7 @@ class ClassificationEval:
             display_labels=label, include_values=True,
             ax=ax)
         if threshold is not None:
-            ax.set_title(f"Confusion Matrix at Threshold={threshold}")
+            ax.set_title(f"Normalized Confusion Matrix at Best Threshold={threshold}")
         return fig
 
     def __plot_roc(self, y_true, y_prob, label, ax):

@@ -66,10 +66,6 @@ class Train:
         # self.data.loc[self.data["median_house_value"] > self.data["median_house_value"].quantile(0.25), "above_median_house_value"] = 1
         # self.data.loc[self.data["median_house_value"] > self.data["median_house_value"].quantile(0.75), "above_median_house_value"] = 2
 
-        # if self.problem_type == "classification":
-        #     self.data[self.label] = self.label_encoder.fit(
-        #         self.data[self.label]).transform(self.data[self.label])
-
         if self.problem_type in ["regression", "classification"] and len(self.datetime_features_names) > 0:
             self.data.drop(self.datetime_features_names, axis=1, inplace=True)
 
@@ -80,7 +76,7 @@ class Train:
         train_data, test_data = train_test_split(
             self.data, test_size=self.split_ratio,
             stratify=self.data[self.label] if self.problem_type == "classification" else None,
-            # random_state=self.config["seed"]
+            random_state=self.config["seed"]
             )
 
         return train_data, test_data
@@ -140,10 +136,10 @@ class Train:
             # ("outlier", CustomTransformer(IsolationForest(contamination=0.1, n_jobs=-1))),
             ("imputation", KNNImputer(
                 n_neighbors=5,
-                # add_indicator=final_missingness_report.isin(["MCAR/ MNAR"]).any()
+                add_indicator=final_missingness_report.isin(["MCAR/ MNAR"]).any()
                 )),
-            # ("feature_eng", FeatureEng(
-            #     features_names=train_data.columns.drop(self.label))),
+            ("feature_eng", FeatureEng(
+                features_names=train_data.columns.drop(self.label))),
             # ("select_feat", SelectKBest(score_func=f_classif, k=5)),
             ("model", model_alg),
         ])
@@ -187,11 +183,11 @@ class Train:
         train_data, test_data = self.__train_test_split()
 
         # EDA
-        # self.__eda(train_data)
+        self.__eda(train_data.copy())
 
         # Missing Value Analysis
         _, final_missingness_report =\
-            self.__missing_val_analysis(train_data)
+            self.__missing_val_analysis(train_data.copy())
 
         # Training
         train_assets = dict()
@@ -200,7 +196,7 @@ class Train:
             logging.info(f"Training {model_alg_name} with hyperparameter tuning={self.tune}")
             train_pipeline = self.__create_train_pipeline(
                 train_data, model_alg,
-                final_missingness_report
+                final_missingness_report=final_missingness_report
                 )
 
             if self.tune:
@@ -234,7 +230,7 @@ class Train:
             else:
                 train_pipeline.fit(
                     train_data.drop(self.label, axis=1),
-                    train_data[self.label].squeeze()
+                    train_data[self.label]
                 )
 
             # Evaluation

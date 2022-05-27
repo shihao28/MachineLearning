@@ -224,10 +224,10 @@ class EDA:
 
         plt.ion()
 
-        self.__save_to_pdf(
-            general_analysis_fig, numeric_features_stats_fig, kdeplot_all,
-            boxplot_all, freqplot_all, cat_vs_cat_plot_all,
-            num_vs_cat_plot_all, corr_fig, num_vs_num_plot_all
-        )
+        # self.__save_to_pdf(
+        #     general_analysis_fig, numeric_features_stats_fig, kdeplot_all,
+        #     boxplot_all, freqplot_all, cat_vs_cat_plot_all,
+        #     num_vs_cat_plot_all, corr_fig, num_vs_num_plot_all
+        # )
 
         return None
