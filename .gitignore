@@ -3,7 +3,7 @@ mlruns
 mlflow.db
 stderr.txt
 stdout.txt
-data/01_raw/housing.csv
+data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
