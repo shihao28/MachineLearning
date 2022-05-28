@@ -5,3 +5,5 @@ pandas
 scikit-learn
 scikit-optimize
 seaborn
+-f https://download.pytorch.org/whl/torch_stable.html
+torch=1.8.1+cu102
