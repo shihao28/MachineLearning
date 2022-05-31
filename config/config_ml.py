@@ -5,7 +5,7 @@ from skopt import BayesSearchCV
 from sklearn.svm import *
 
 
-class Config(object):
+class ConfigML(object):
 
     # Training config
     train = dict(
@@ -68,6 +68,7 @@ class Config(object):
         ),
 
         seed=0
+
     )
 
     # Prediction config

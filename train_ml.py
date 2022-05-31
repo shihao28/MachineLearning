@@ -1,5 +1,4 @@
 import logging
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder, LabelEncoder
@@ -13,7 +12,7 @@ from sklearn.ensemble import *
 from sklearn.svm import *
 from sklearn.metrics import *
 
-from config import Config
+from config import ConfigML
 from src.eda import EDA
 from src.missingval_analysis import MissingValAnalysis
 from src.feature_eng import FeatureEng
@@ -28,7 +27,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 
 
-class Train:
+class TrainML:
     def __init__(self, config):
 
         logging.info("Initializing...")
@@ -71,12 +70,13 @@ class Train:
 
         return None
 
-    def __train_test_split(self):
+    @staticmethod
+    def train_test_split(data, split_ratio, problem_type, label, seed):
         logging.info("Train-test splitting...")
         train_data, test_data = train_test_split(
-            self.data, test_size=self.split_ratio,
-            stratify=self.data[self.label] if self.problem_type == "classification" else None,
-            random_state=self.config["seed"]
+            data, test_size=split_ratio,
+            stratify=data[label] if problem_type == "classification" else None,
+            random_state=seed
             )
 
         return train_data, test_data
@@ -180,7 +180,9 @@ class Train:
         self.__preprocessing()
 
         # Train-test split
-        train_data, test_data = self.__train_test_split()
+        train_data, test_data = self.train_test_split(
+            self.data, self.split_ratio, self.problem_type,
+            self.label, self.config["seed"])
 
         # EDA
         self.__eda(train_data.copy())
@@ -193,7 +195,7 @@ class Train:
         train_assets = dict()
         best_score = 0
         for model_alg_name, model_alg in self.model_algs.items():
-            logging.info(f"Training {model_alg_name} with hyperparameter tuning={self.tune}")
+            logging.info(f"Training {model_alg_name} with hyperparameter tuning={self.tune}...")
             train_pipeline = self.__create_train_pipeline(
                 train_data, model_alg,
                 final_missingness_report=final_missingness_report
@@ -259,4 +261,4 @@ class Train:
 
 
 if __name__ == "__main__":
-    Train(Config.train).train()
+    TrainML(ConfigML.train).train()
