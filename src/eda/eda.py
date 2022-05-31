@@ -42,6 +42,7 @@ class EDA:
         general_analysis.loc[general_analysis["Features_Type"].index.isin(self.category_features_names), "Feature_Type"] = "Category"
 
         general_analysis_fig, general_analysis_ax = plt.subplots()
+        general_analysis_ax.axis('tight')
         general_analysis_ax.axis('off')
         general_analysis_ax.table(
             cellText=general_analysis.values,
@@ -83,6 +84,7 @@ class EDA:
             # ax_tmp.text(0.5, 0.5, "test", fontsize=22)
             if (i + 1) % self.num_plot_per_fig == 0 or i == len(numeric_features_dropna.columns)-1:
                 kdeplot_all.append(kdeplot_fig)
+                plt.tight_layout()
 
         # Boxplot
         boxplot_all = []
@@ -98,6 +100,7 @@ class EDA:
             boxplot_ax[row_idx, col_idx].set_title(f"{name}")
             if (i + 1) % self.num_plot_per_fig == 0 or i == len(numeric_features_dropna.columns)-1:
                 boxplot_all.append(boxplot_fig)
+                plt.tight_layout()
 
         # Category features
         # Freq plot
@@ -115,6 +118,7 @@ class EDA:
             freqplot_ax[row_idx, col_idx].set_title(f"{name}")
             if (i + 1) % self.num_plot_per_fig == 0 or i == len(category_features_dropna.columns)-1:
                 freqplot_all.append(freqplot_fig)
+                plt.tight_layout()
 
         return numeric_features_stats_fig, kdeplot_all, boxplot_all, freqplot_all
 
@@ -144,6 +148,7 @@ class EDA:
                     title=f"{column_a} vs {column_b} with {self.label} as count")
                 if (i + 1) % self.num_plot_per_fig == 0 or i == len(columns_comb)-1:
                     cat_vs_cat_plot_all.append(cat_vs_cat_plot_fig)
+                    plt.tight_layout()
 
         # Numerical vs Categorical
         num_vs_cat_plot_all = []
@@ -162,6 +167,7 @@ class EDA:
                     ax=num_vs_cat_plot_ax[row_idx, col_idx])
                 if (i + 1) % self.num_plot_per_fig == 0 or i == len(columns_comb)-1:
                     num_vs_cat_plot_all.append(num_vs_cat_plot_fig)
+                    plt.tight_layout()
 
         # Numerical vs Numerical
         # correlation plot
@@ -188,6 +194,7 @@ class EDA:
                 title=f"Plot of {column_b} vs {column_a}")
             if (i + 1) % self.num_plot_per_fig == 0 or i == len(columns_comb)-1:
                 num_vs_num_plot_all.append(num_vs_num_plot_fig)
+                plt.tight_layout()
 
         return cat_vs_cat_plot_all, num_vs_cat_plot_all, corr_fig, num_vs_num_plot_all
 
@@ -224,10 +231,10 @@ class EDA:
 
         plt.ion()
 
-        # self.__save_to_pdf(
-        #     general_analysis_fig, numeric_features_stats_fig, kdeplot_all,
-        #     boxplot_all, freqplot_all, cat_vs_cat_plot_all,
-        #     num_vs_cat_plot_all, corr_fig, num_vs_num_plot_all
-        # )
+        self.__save_to_pdf(
+            general_analysis_fig, numeric_features_stats_fig, kdeplot_all,
+            boxplot_all, freqplot_all, cat_vs_cat_plot_all,
+            num_vs_cat_plot_all, corr_fig, num_vs_num_plot_all
+        )
 
         return None

@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
-import missingno as msno
 from sklearn.impute import MissingIndicator
 from sklearn.preprocessing import StandardScaler
 from scipy import stats
+from matplotlib import pyplot as plt
+import missingno as msno
 
 
 # https://towardsdev.com/how-to-identify-missingness-types-with-missingno-61cfe0449ad9
@@ -66,6 +67,8 @@ class MissingValAnalysis:
         return missingness_report, final_missingness_report
 
     def generate_report(self):
+        plt.ioff()
+
         # Replace empty string with nan
         self.data.replace("", np.nan, inplace=True)
 
@@ -98,5 +101,7 @@ class MissingValAnalysis:
 
         # Conduct hypothesis testing to check type of missingness
         missingness_report, final_missingness_report = self.__hypothesis_testing()
+
+        plt.ion()
 
         return missingness_report, final_missingness_report
