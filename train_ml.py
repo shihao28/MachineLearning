@@ -43,7 +43,7 @@ class TrainML:
         self.tune = config["tuning"]["tune"]
         self.tune_alg = config["tuning"]["search_method"]
         self.param_grids = config["tuning"]
-        self.metrics = config["evaluation"]["classification"]
+        self.metrics = config["evaluation"][self.problem_type]
         self.train_data, self.test_data = None, None
         # if self.problem_type == "classification":
         #     self.label_encoder = LabelEncoder()

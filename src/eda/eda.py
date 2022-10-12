@@ -11,8 +11,7 @@ from sklearn.preprocessing import StandardScaler
 class EDA:
     def __init__(
         self, problem_type, data, label, numeric_features_names,
-        category_features_names,
-            datetime_features_names, scale=True):
+        category_features_names, datetime_features_names, scale=True):
 
         self.problem_type = problem_type
         self.data = data
