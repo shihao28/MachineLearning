@@ -1,0 +1,101 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+variables:
+- name: agent_pool
+  value: 'dsframework'  # TODO: Change to self-hosted agent if available
+- name: venv_name
+  value: 'pyml'
+- name: python_path
+  value: '/usr/local/bin/python3.7'
+
+- group: pymlframework_dev_env
+
+trigger:
+  - main
+  - master
+  - development
+
+# Microsoft-hosted agent template
+# pool:
+#   vmImage: $(agent_pool)
+
+# Self-hosted agent template
+pool: $(agent_pool)
+
+stages:
+- stage: CI_Unit_Tests
+  displayName: Unit Test Stage
+  jobs:
+  - job: Build
+    displayName: Performing Unit Tests
+    steps:
+    # setup python environment and install dependencies
+    - script: |
+        git submodule deinit --all --force
+        git submodule init
+        git config submodule.base.url https://$(PAT)@dev.azure.com/PETRONAS-Alpha/DS-Frameworks/_git/base
+        git submodule update --init --recursive
+      enabled: true
+      displayName: Checkout Submodules
+    
+    - script: |
+        $(python_path) -m venv $(venv_name)
+        source $(venv_name)/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r ./src/requirements.txt
+        pip install pytest
+      displayName: Setup venv and install dependencies
+
+    # generate pytest report (separate by script/section)
+    - script: |
+        source $(venv_name)/bin/activate
+        python3 -m pytest ./tests/unit/data_loading --junitxml="./tests/pytest_data_loading_report.xml"
+      displayName: pytest_data_loading
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    - script: |
+        source $(venv_name)/bin/activate
+        python3 -m pytest ./tests/unit/pipelines --junitxml="./tests/pytest_pipelines_report.xml"
+      displayName: pytest_pipelines
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    - script: |
+        source $(venv_name)/bin/activate
+        python3 -m pytest ./tests/unit/test_cmd.py --junitxml="./tests/pytest_cmd_report.xml"
+      displayName: pytest_cmd
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    # publish test results
+    - task: PublishTestResults@2
+      displayName: Publish Test Results
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/pytest_*_report.xml'
+        mergeTestResults: true
+        testRunTitle: 'PyTest Report'
+      condition: always()
+      enabled: true

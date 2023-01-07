@@ -1,0 +1,71 @@
+
+variables:
+- name: agent_pool
+  value: 'dsframework'  # TODO - Change agent pool (Microsoft/ self-hosted)
+- name: vm_environment
+  value: 'ds sandbox pyml'  # TODO - Change vm_environment
+- name: spa_service_connection
+  value: 'dsframeworkdev-spn'  # TODO - Change spa_service_connection
+- name: artifact_name
+  value: 'PyMLFrameWork'  # TODO - Change artifact_name
+- name: resource_group
+  value: 'PTAZSG-DEV-DSP-RG'  # TODO - Change resource_group
+- name: webAppName
+  value: 'ptsg-5dspwb05'  # TODO - Change webAppName
+- name: slot
+  value: 'pyml'  # TODO - Change slot
+- name: acr_url
+  value: 'ptsg5dspcr01.azurecr.io'  # TODO - Change acr_url
+- name: acr_id
+  value: 'ptsg5dspcr01' # TODO - Change acr_id
+- name: imageName
+  value: 'pymlframework'  # TODO - Change imageName
+- name: cr
+  value: 'container_registry01'  # TODO - Change container registry
+- name: app_port
+  value: 8000  # TODO - Change VM App Port
+- name: mlflow_port
+  value: 5000  # TODO - Change VM mlflow Port
+- name: workers
+  value: 4
+- name: vm_app
+  value: 'false'  # TODO - Change vm_app true/false
+- name: app_service
+  value: 'false'  # TODO - Change app_service true/false
+
+- group: pymlframework_dev_env  # TODO - Change group env from Pipeline library
+
+trigger: none
+
+# Microsoft-hosted agent template
+# pool:
+#   vmImage: $(agent_pool)
+
+# Self-hosted agent template
+pool: $(agent_pool)
+
+stages:
+- stage: CT
+  displayName: Continuous Training
+  jobs:
+  - job: Continuous_Training
+    displayName: Continuous Training
+  - deployment: VMDeploy
+    displayName: Model Training on VM
+    pool:
+      vmImage: $(agent_pool)
+    environment:
+      name: $(vm_environment)
+      resourceType: VirtualMachine
+      tags: 'PTSG-5DSPap02'
+    strategy:
+      rolling:
+        deploy:
+          steps:
+            - script: |
+                  echo '>' Get container id of running container
+                  CONTAINER_ID=`docker inspect --format="{{.Id}}"  $(imageName)`
+                  echo '>' Run download and train task in container $CONTAINER_ID
+                  docker exec $CONTAINER_ID bash -c "python main.py download; \
+                  python main.py -u remote train -a LR -v above_median_house_value -register above_median_house_value"
+              displayName: Run train task with docker

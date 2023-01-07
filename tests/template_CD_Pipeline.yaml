@@ -1,0 +1,161 @@
+# Note: The template assumes self-hosted agent is already set-up
+variables:
+- name: agent_pool
+  value: 'DS_Pool'  # TODO: Change self-hosted agent_pool
+- name: vm_environment
+  value: 'DS-CICD'  # TODO - Change vm_environment
+- name: spa_service_connection
+  value: 'SPA_Conn-DS-Pipelines_Training'  # TODO - Change spa_service_connection
+- name: artifact_name
+  value: 'pytrainer'  # TODO - Change artifact_name
+- name: resource_group
+  value: 'PTAZSG-DEV-DSP-RG'  # TODO - Change resource_group
+- name: webAppName
+  value: 'ptsg-5dspwb04'  # TODO - Change webAppName
+- name: slot
+  value: 'pytrainer'  # TODO - Change slot
+- name: acr_url
+  value: 'ptsg5dspcr05.azurecr.io'  # TODO - Change acr_url
+- name: acr_id
+  value: 'ptsg5dspcr05' # TODO - Change acr_id
+- name: imageName
+  value: 'pytrainer'  # TODO - Change imageName
+- name: cr
+  value: 'CR_05'  # TODO - Change container registry
+- name: app_port
+  value: 8005  # TODO - Change VM App Port
+- name: mlflow_port
+  value: 5005  # TODO - Change VM mlflow Port
+- name: workers
+  value: 4
+- name: vm_app
+  value: 'true'  # TODO - Change vm_app true/false
+- name: app_service
+  value: 'true'  # TODO - Change app_service true/false
+
+- group: pytrainer_dev_env  # TODO - Change group env from Pipeline library
+
+trigger: none
+
+
+# Self-hosted agent template
+pool: $(agent_pool)
+
+stages:
+- stage: CI_Build
+  displayName: Publish Artifact Stage (Virtual Environment Initialisation)
+  jobs:
+  - job: Setup
+    displayName: Setup venv, and publish artifact
+    steps:
+      - task: CopyFiles@2
+        displayName: Copy Files to Artifact Staging Directory
+        inputs:
+          SourceFolder: $(System.DefaultWorkingDirectory)
+          contents: |
+            **
+          TargetFolder: $(Build.ArtifactStagingDirectory)
+
+      - task: Docker@2
+        enabled: true
+        condition: succeeded()
+        inputs:
+          containerRegistry: $(cr)
+          repository: $(imageName)
+          command: 'buildAndPush'
+          Dockerfile: '$(Build.ArtifactStagingDirectory)/Dockerfile'
+          tags: |
+            $(Build.BuildId)
+        displayName: Build and Push Docker Image
+
+      - task: ArchiveFiles@2
+        inputs:
+          rootFolderOrFile: $(Build.ArtifactStagingDirectory)
+          includeRootFolder: false
+          archiveType: 'zip'
+          archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+          replaceExistingArchive: true
+        displayName: Archive files
+
+      # publish files under PyMLFramework artifact
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathToPublish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+          artifactName: $(artifact_name)
+        displayName: Publish zip as artifact
+
+
+- stage: CD_Deploy
+  displayName: CD Stage
+  jobs:
+  - job: Dockerize_Python_App
+    displayName: Dockerize Python Application
+    steps:
+
+    - task: AzureWebAppContainer@1
+      condition: and(succeeded(), eq('${{ variables.app_service }}', 'true'))
+      inputs:
+        azureSubscription: $(spa_service_connection)
+        appName: $(webAppName)
+        deployToSlotOrASE: true
+        resourceGroupName: $(resource_group)
+        slotName: $(slot)
+        containers: '$(acr_url)/$(imageName):$(Build.BuildId)'
+        appSettings:
+          -Port 8080
+          -RequestTimeout 100
+          -WEBSITE_TIME_ZONE "Singapore Standard Time"
+          -WEBSITES_PORT 8080
+          -WEBSITES_ENABLE_APP_SERVICE_STORAGE true
+          -DOCKER_REGISTRY_SERVER_URL $(acr_url)
+          -DOCKER_REGISTRY_SERVER_USERNAME $(acr_id)
+          -DOCKER_REGISTRY_SERVER_PASSWORD $(CR_PASSWORD)
+          -AZURE_STORAGE_ACCESS_KEY $(AZURE_STORAGE_ACCESS_KEY)
+          -AZURE_STORAGE_CONNECTION_STRING $(AZURE_STORAGE_CONNECTION_STRING)
+          -CR_PASSWORD $(CR_PASSWORD)
+          -password $(password)
+          -WORKERS $(workers)
+          -VM_APP $(vm_app)
+          -APP_SERVICE $(app_service)
+          -VM_MLFLOW_PORT $(mlflow_port)
+        configurationStrings: '-python 3.7'
+        containerCommand: 'uvicorn --workers $(workers) --host 0.0.0.0 --port 8080 src.api.api_main:app'
+      enabled: true
+      displayName: Deploy to Azure Web App for Containers
+
+  - deployment: VMDeploy
+    displayName: Dockerize_VM_environment
+    pool:
+      vmImage: $(agent_pool)
+    environment:
+      name: $(vm_environment)
+      resourceType: VirtualMachine
+      tags: 'PTSG-5DSPap01'
+    strategy:
+      rolling:
+        deploy:
+          steps:
+            - script: |
+                  echo '>' Remove unused images, containers, and volumes
+                  docker system prune -f
+                  echo '>' Remove container $(imageName) if up and running
+                  docker top $(imageName) && docker rm -f $(imageName) && echo remove container $(imageName) || echo container $(imageName) is not running
+                  docker login --username $(acr_id) --password $(CR_PASSWORD) $(acr_url)
+                  echo '>' Pull latest image of $(acr_url)/$(imageName):$(Build.BuildId) from Azure Container Registry
+                  docker pull $(acr_url)/$(imageName):$(Build.BuildId)
+                  docker logout $(acr_url)
+                  # docker container inspect $(imageName) && docker rm -f $(imageName) || echo container $(imageName) is not running
+                  echo '>' Run container $(acr_url)/$(imageName):$(Build.BuildId)
+                  docker run --name $(imageName) -p $(app_port):8080 -p $(mlflow_port):5000 \
+                  --env AZURE_STORAGE_ACCESS_KEY='$(AZURE_STORAGE_ACCESS_KEY)' \
+                  --env AZURE_STORAGE_CONNECTION_STRING='$(AZURE_STORAGE_CONNECTION_STRING)' \
+                  --env CR_PASSWORD='$(CR_PASSWORD)' \
+                  --env password='$(password)' \
+                  --env WORKERS='$(workers)' \
+                  --env VM_APP='$(vm_app)' \
+                  --env VM_MLFLOW_PORT='$(mlflow_port)' \
+                  -td $(acr_url)/$(imageName):$(Build.BuildId)
+                  echo '>' List down all images and containers
+                  docker images
+                  docker ps -a
+              displayName: Run Docker container on VM

@@ -64,12 +64,12 @@ class ClassificationEval:
             self.is_binary_cls = True
             self.y_prob = y_prob[:, 1]
 
-    def __get_metrics(self, y_true, y_pred, label):
+    def _get_metrics(self, y_true, y_pred, label):
         cls_report = classification_report(
-                y_true, y_pred, target_names=label, output_dict=True)
+                y_true, y_pred, target_names=label, output_dict=False)
         return cls_report
 
-    def __plot_conf_matrix(self, y_true, y_pred, label, threshold=None):
+    def _plot_conf_matrix(self, y_true, y_pred, label, threshold=None):
         fig, ax = plt.subplots()
         conf_matrix = ConfusionMatrixDisplay.from_predictions(
             y_true, y_pred, normalize="all",
@@ -79,14 +79,14 @@ class ClassificationEval:
             ax.set_title(f"Normalized Confusion Matrix at Best Threshold={threshold}")
         return fig
 
-    def __plot_roc(self, y_true, y_prob, label, ax):
+    def _plot_roc(self, y_true, y_prob, label, ax):
         roc_plot = RocCurveDisplay.from_predictions(
             y_true, y_prob, ax=ax)
         ax.set_title(f"Class: {label}")
 
         return roc_plot
 
-    def __plot_precision_recall(self, y_true, y_prob, label, ax):
+    def _plot_precision_recall(self, y_true, y_prob, label, ax):
         precision_recall_plot = PrecisionRecallDisplay.from_predictions(
             y_true, y_prob, ax=ax)
         ax.set_title(f"Class: {label}")
@@ -103,7 +103,7 @@ class ClassificationEval:
             fig_all = dict()
             for threshold in np.arange(1, 10) / 10:
                 y_pred = np.where(self.y_prob > threshold, 1, 0)
-                cls_report = self.__get_metrics(
+                cls_report = self._get_metrics(
                     self.y_true, y_pred, self.label)
                 if len(METRICS_MAPPING[self.metrics]) == 1:
                     metrics = METRICS_MAPPING[self.metrics][0]
@@ -121,11 +121,11 @@ class ClassificationEval:
                     best_cls_report = cls_report
                     best_threshold = threshold
                     best_y_pred = y_pred
-            conf_matrix_fig = self.__plot_conf_matrix(
+            conf_matrix_fig = self._plot_conf_matrix(
                 self.y_true, best_y_pred, self.label,
                 best_threshold)
             fig, ax = plt.subplots(1, 2)
-            roc_plot = self.__plot_roc(
+            roc_plot = self._plot_roc(
                 self.y_true, self.y_prob, self.label[1], ax[0])
             precision_recall_plot = self.__plot_precision_recall(
                 self.y_true, self. y_prob, self.label[1], ax[1])
@@ -140,9 +140,9 @@ class ClassificationEval:
             y_pred = np.argmax(self.y_prob, 1)
             # Beware of bugs here during onehotencoding
             y_true_onehot = pd.get_dummies(self.y_true).values
-            cls_report = self.__get_metrics(
+            cls_report = self._get_metrics(
                 self.y_true, y_pred, label=self.label)
-            conf_matrix_fig = self.__plot_conf_matrix(
+            conf_matrix_fig = self._plot_conf_matrix(
                 self.y_true, y_pred, self.label)
             score = f1_score(
                 self.y_true, y_pred,
@@ -150,7 +150,7 @@ class ClassificationEval:
             fig_all = dict()
             for i, label in enumerate(self.label):
                 fig, ax = plt.subplots(1, 2)
-                roc_plot = self.__plot_roc(
+                roc_plot = self._plot_roc(
                     y_true_onehot[:, i], self.y_prob[:, i], label, ax=ax[0])
                 precision_recall_plot = self.__plot_precision_recall(
                     y_true_onehot[:, i], self. y_prob[:, i], label, ax[1])

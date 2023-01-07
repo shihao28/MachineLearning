@@ -1,0 +1,82 @@
+# Note: The template assumes self-hosted agent is already set-up
+variables:
+- name: agent_pool
+  value: 'DS_Pool'  # TODO: Change self-hosted agent_pool
+- name: venv_name
+  value: 'pytrainer'
+- name: python_path
+  value: '/usr/local/bin/python3.7'
+
+- group: pytrainer_dev_env
+
+trigger:
+  - development
+
+# Self-hosted agent template
+pool: $(agent_pool)
+
+stages:
+- stage: CI_Unit_Tests
+  displayName: Unit Test Stage
+  jobs:
+  - job: Build
+    displayName: Performing Unit Tests
+    steps:
+    - script: |
+        $(python_path) -m venv $(venv_name)
+        source $(venv_name)/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r ./src/requirements.txt
+        pip install pytest
+      displayName: Setup venv and install dependencies
+
+    # generate pytest report (separate by script/section)
+    - script: |
+        source $(venv_name)/bin/activate
+        python -m pytest ./tests/unit/data_loading --junitxml="./tests/pytest_data_loading_report.xml"
+      displayName: pytest_data_loading
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    - script: |
+        source $(venv_name)/bin/activate
+        python -m pytest ./tests/unit/pipelines --junitxml="./tests/pytest_pipelines_report.xml"
+      displayName: pytest_pipelines
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    - script: |
+        source $(venv_name)/bin/activate
+        python -m pytest ./tests/unit/test_cmd.py --junitxml="./tests/pytest_cmd_report.xml"
+      displayName: pytest_cmd
+      condition: always()
+      env:
+        password: $(password)
+        AZURE_STORAGE_ACCESS_KEY: $(AZURE_STORAGE_ACCESS_KEY)
+        AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+        CR_PASSWORD: $(CR_PASSWORD)
+        PAT: $(PAT)
+      enabled: true
+
+    # publish test results
+    - task: PublishTestResults@2
+      displayName: Publish Test Results
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/pytest_*_report.xml'
+        mergeTestResults: true
+        testRunTitle: 'PyTest Report'
+      condition: always()
+      enabled: true
